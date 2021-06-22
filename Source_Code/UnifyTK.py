@@ -88,6 +88,9 @@ class UnifyTK(Tk.Frame):
         elif keyword_check == 'Sample Type':
             AgilentUnify(self.csv_file_in_list_format).agilent_unify_controller()
             self.write_log_to_text_box("Agilent csv file detected, sending down AgilentUnify pathway. \n")
+        elif keyword_check == 'Type':
+            AgilentUnify(self.csv_file_in_list_format).agilent_unify_controller(old_icp=True)
+            self.write_log_to_text_box("Agilent csv file detected, sending down AgilentUnify pathway. \n")
         else:
             self.write_log_to_text_box("No valid unify pathway detected for this csv file. \n")
 

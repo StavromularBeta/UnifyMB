@@ -44,65 +44,115 @@ class AgilentUnify:
                                                  'Analyte': 0,
                                                  'Mass': 0,
                                                  'Concentration': 0,
-                                                 'Units': 0
+                                                 'Units': 0,
+                                                 'Tune Step': 0,
                                                  }
+        self.required_fields_index_dictionary_old_icp = {'Solution Label': 0,
+                                                         'Type': 0,
+                                                         'Date Time': 0,
+                                                         }
         self.main_file_name = ""
 
-    def agilent_unify_controller(self):
+    def agilent_unify_controller(self, old_icp=False):
         """The main controller function for AgilentUnify. """
-
-        self.find_indexes_of_required_fields()
-        self.create_condensed_csv_file_with_only_relevant_fields()
+        if old_icp:
+            self.find_indexes_of_required_fields(old_icp)
+            self.create_condensed_csv_file_with_only_relevant_fields(old_icp)
+        else:
+            self.find_indexes_of_required_fields()
+            self.create_condensed_csv_file_with_only_relevant_fields()
         self.generate_excel_files()
         # have the option of generating excel files with xlsxwriter, can format somewhat
         # or make un-formatted csv files.
         # self.generate_csv_files()
 
-    def find_indexes_of_required_fields(self):
-        """finds the indexes of the fields we need to create our unified excel format."""
+    def find_indexes_of_required_fields(self, old_icp=False):
+        """finds the indexes of the fields we need to create our unified excel format.
 
-        required_field_index_counter = 0
-        for item in self.csv_file_in_list_of_list_format[0]:
-            if item in self.required_fields_index_dictionary.keys():
-                # then it is a required field
-                # add the index we are at to the dictionary
-                self.required_fields_index_dictionary[item] = required_field_index_counter
-            required_field_index_counter += 1
+        This is somewhat unnecessary, because with Agilent instruments, we can always trim fields we don't need, and
+        we can put fields in whatever order we want, so we could in theory already know these indexes. However, having
+        this function in place allows us to be lazy - we don't need to care about the order of fields, and we can ignore
+        any extra fields. """
+        if old_icp:
+            required_field_index_counter = 0
+            for item in self.csv_file_in_list_of_list_format[0]:
+                if item in self.required_fields_index_dictionary_old_icp.keys():
+                    # then it is a required field
+                    # add the index we are at to the dictionary
+                    self.required_fields_index_dictionary_old_icp[item] = required_field_index_counter
+                required_field_index_counter += 1
+        else:
+            required_field_index_counter = 0
+            for item in self.csv_file_in_list_of_list_format[0]:
+                if item in self.required_fields_index_dictionary.keys():
+                    # then it is a required field
+                    # add the index we are at to the dictionary
+                    self.required_fields_index_dictionary[item] = required_field_index_counter
+                required_field_index_counter += 1
 
-    def create_condensed_csv_file_with_only_relevant_fields(self):
-        """takes only the required fields from the full csv file, and creates a condensed list of lists."""
+    def create_condensed_csv_file_with_only_relevant_fields(self, old_icp=False):
+        """takes only the required fields from the full csv file, and creates a condensed list of lists.
 
-        for item in self.csv_file_in_list_of_list_format[1:]:
-            if item[13] == '1':
-                tune_step = 'no gas'
-            elif item[13] == '2':
-                tune_step = 'H'
-            elif item[13] == '3':
-                tune_step = 'He'
-            else:
-                tune_step = 'not found'
-            sample_date = item[self.required_fields_index_dictionary['Date and Time Acquired']][0:10]
-            sample_time = item[self.required_fields_index_dictionary['Date and Time Acquired']][11:]
-            analyte_name = str(item[self.required_fields_index_dictionary['Analyte']] + ' ' +
-                               item[self.required_fields_index_dictionary['Mass']] + ' [' +
-                               tune_step + ']'
-                               )
-            condensed_line = ['Agilent Instruments: ICP',
-                              item[self.required_fields_index_dictionary['Data File Name']],
-                              sample_date,
-                              sample_time,
-                              item[self.required_fields_index_dictionary['Sample Name']],
-                              item[self.required_fields_index_dictionary['Sample Type']],
-                              analyte_name,
-                              item[self.required_fields_index_dictionary['Concentration']],
-                              " "]
-            self.csv_file_in_list_of_list_format_condensed.append(condensed_line)
-        # could do this better, getting the main file name from the first item (individual data file name) minus
-        # the last 3 numbers
-        self.main_file_name = self.csv_file_in_list_of_list_format[1][5][:-2]
+        currently the only Agilent instruments we are concerned with produce ICP/MS data, so this method
+        is hard coded to that type of data. If we can later get Agilent data off of the older Agilent instruments
+        in .csv format, this method will need to be broadened with extra conditions. """
+        if old_icp:
+            analytes_list = self.csv_file_in_list_of_list_format[0][6:]
+            for item in self.csv_file_in_list_of_list_format[1:]:
+                sample_date_and_time = item[self.required_fields_index_dictionary_old_icp['Date Time']].split(" ")
+                sample_date = sample_date_and_time[0]
+                sample_time = sample_date_and_time[1] + " " + sample_date_and_time[2]
+                if len(self.main_file_name) > 0:
+                    pass
+                else:
+                    self.main_file_name = "Harry_icp_" + sample_date[0]
+                analyte_counter = 6
+                for analyte in analytes_list:
+                    condensed_line = ['Agilent Instruments: ICP',
+                                      'no data file provided',
+                                      sample_date,
+                                      sample_time,
+                                      item[self.required_fields_index_dictionary_old_icp['Solution Label']],
+                                      item[self.required_fields_index_dictionary_old_icp['Type']],
+                                      analyte,
+                                      item[analyte_counter],
+                                      " "]
+                    self.csv_file_in_list_of_list_format_condensed.append(condensed_line)
+                    analyte_counter += 1
+        else:
+            for item in self.csv_file_in_list_of_list_format[1:]:
+                if item[self.required_fields_index_dictionary['Tune Step']] == '1':
+                    tune_step = 'no gas'
+                elif item[self.required_fields_index_dictionary['Tune Step']] == '2':
+                    tune_step = 'H'
+                elif item[self.required_fields_index_dictionary['Tune Step']] == '3':
+                    tune_step = 'He'
+                else:
+                    tune_step = 'not found'
+                sample_date = item[self.required_fields_index_dictionary['Date and Time Acquired']][0:10]
+                sample_time = item[self.required_fields_index_dictionary['Date and Time Acquired']][11:]
+                analyte_name = str(item[self.required_fields_index_dictionary['Analyte']] + ' ' +
+                                   item[self.required_fields_index_dictionary['Mass']] + ' [' +
+                                   tune_step + ']'
+                                   )
+                condensed_line = ['Agilent Instruments: ICP',
+                                  item[self.required_fields_index_dictionary['Data File Name']],
+                                  sample_date,
+                                  sample_time,
+                                  item[self.required_fields_index_dictionary['Sample Name']],
+                                  item[self.required_fields_index_dictionary['Sample Type']],
+                                  analyte_name,
+                                  item[self.required_fields_index_dictionary['Concentration']],
+                                  " "]
+                self.csv_file_in_list_of_list_format_condensed.append(condensed_line)
+            # could do this better, getting the main file name from the first item (individual data file name) minus
+            # the last 3 numbers
+            self.main_file_name = self.csv_file_in_list_of_list_format[1][5][:-2]
 
     def generate_excel_files(self):
-        """generates excel file versions of the unified excel format, using xlsxwriter. """
+        """generates excel file versions of the unified excel format, using xlsxwriter.
+
+        allows us to add formatting to the file produced, which we can't do with the .csv version."""
 
         target = r'T:\ANALYST WORK FILES\Peter\CrystalMB\UnifiedExcelFiles\ '
         batch_name = str(self.main_file_name)
@@ -156,7 +206,9 @@ class AgilentUnify:
         workbook.close()
 
     def generate_csv_files(self):
-        """generates csv file versions of the unified excel format, using python's built in csv library. """
+        """generates csv file versions of the unified excel format, using python's built in csv library.
+
+        files generated have no formatting. Can use generate_excel_files, which comes with visual formatting."""
 
         target = r'T:\ANALYST WORK FILES\Peter\CrystalMB\UnifiedExcelFiles\ '
         try:
