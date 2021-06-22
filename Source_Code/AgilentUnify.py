@@ -5,7 +5,7 @@ import xlsxwriter
 
 
 class AgilentUnify:
-    """Converts Agilent csv data to the Unified Excel Format.
+    """Converts Agilent csv data to the Unified Excel Format. Handles two different types of .csv outputs.
 
     Attributes
     ----------
@@ -15,8 +15,12 @@ class AgilentUnify:
         csv file to be converted in a list of lists. Any extra fields not required are removed.
     required_fields_index_dictionary : dict
         dictionary of required file fields, and their indexes. 0's are placeholders, indexes are found later.
+        relevant to the newer ICP/MS.
+    required_fields_index_dictionary_old_icp : dict
+        dictionary of required file fields, and their indexes. 0's are placeholders, indexes are found later.
+        relevant to the older ICP/MS.
     main_file_name : string
-        the name of the excel file to be generated. Same as the batch name you'd use for the targetlynx file.
+        the name of the excel file to be generated. Same as the batch name you'd use for the TargetLynx file.
     """
 
     def __init__(self, csv_file_in_list_of_list_format):
@@ -54,7 +58,13 @@ class AgilentUnify:
         self.main_file_name = ""
 
     def agilent_unify_controller(self, old_icp=False):
-        """The main controller function for AgilentUnify. """
+        """The main controller function for AgilentUnify.
+
+        Parameters
+        ----------
+        old_icp=False
+            True if we are handling old ICP output.
+            """
         if old_icp:
             self.find_indexes_of_required_fields(old_icp)
             self.create_condensed_csv_file_with_only_relevant_fields(old_icp)
@@ -72,7 +82,13 @@ class AgilentUnify:
         This is somewhat unnecessary, because with Agilent instruments, we can always trim fields we don't need, and
         we can put fields in whatever order we want, so we could in theory already know these indexes. However, having
         this function in place allows us to be lazy - we don't need to care about the order of fields, and we can ignore
-        any extra fields. """
+        any extra fields.
+
+        Parameters
+        ----------
+        old_icp=False
+            True if we are handling old ICP output.
+        """
         if old_icp:
             required_field_index_counter = 0
             for item in self.csv_file_in_list_of_list_format[0]:
@@ -93,21 +109,31 @@ class AgilentUnify:
     def create_condensed_csv_file_with_only_relevant_fields(self, old_icp=False):
         """takes only the required fields from the full csv file, and creates a condensed list of lists.
 
-        currently the only Agilent instruments we are concerned with produce ICP/MS data, so this method
-        is hard coded to that type of data. If we can later get Agilent data off of the older Agilent instruments
-        in .csv format, this method will need to be broadened with extra conditions. """
+        older ICP/MS as far as I can tell won't provide one analyte per line, will only do one sample per line,
+        with each analyte given as a field. We handle this by iterating over the data part of the sample line, and
+        copying the sample data each time to create analyte lines.
+
+        Parameters
+        ----------
+        old_icp=False
+            True if we are handling old ICP output. """
         if old_icp:
+            # from 6 on, it's just data
             analytes_list = self.csv_file_in_list_of_list_format[0][6:]
             for item in self.csv_file_in_list_of_list_format[1:]:
+                # have to use split because old ICP doesn't add 0's to the start of single digit day numbers
                 sample_date_and_time = item[self.required_fields_index_dictionary_old_icp['Date Time']].split(" ")
                 sample_date = sample_date_and_time[0]
                 sample_time = sample_date_and_time[1] + " " + sample_date_and_time[2]
                 if len(self.main_file_name) > 0:
                     pass
                 else:
+                    # putting in a placeholder file name. As of right now, no way to carry through the filename. I'm
+                    # sure it's an option in the software output settings, will figure out later. (22June21)
                     self.main_file_name = "Harry_icp_" + sample_date[0]
                 analyte_counter = 6
                 for analyte in analytes_list:
+                    # iterating through the analytes, creating a new line for each one.
                     condensed_line = ['Agilent Instruments: ICP',
                                       'no data file provided',
                                       sample_date,
@@ -120,7 +146,12 @@ class AgilentUnify:
                     self.csv_file_in_list_of_list_format_condensed.append(condensed_line)
                     analyte_counter += 1
         else:
+            # much more straightforward, because each line is an analyte, and I've already pretty much selected
+            # the fields that I want.
             for item in self.csv_file_in_list_of_list_format[1:]:
+                # instrument runs in a bunch of different gas modes, and provides data for each analyte in each mode
+                # generally one is better/ more accurate/ more reliable. Maybe will filter out some of these
+                # in the future for a less cluttered file. (22June21)
                 if item[self.required_fields_index_dictionary['Tune Step']] == '1':
                     tune_step = 'no gas'
                 elif item[self.required_fields_index_dictionary['Tune Step']] == '2':
@@ -129,6 +160,7 @@ class AgilentUnify:
                     tune_step = 'He'
                 else:
                     tune_step = 'not found'
+                # can do this because new ICP software adds a leading 0 to single digit numbers
                 sample_date = item[self.required_fields_index_dictionary['Date and Time Acquired']][0:10]
                 sample_time = item[self.required_fields_index_dictionary['Date and Time Acquired']][11:]
                 analyte_name = str(item[self.required_fields_index_dictionary['Analyte']] + ' ' +
@@ -152,7 +184,10 @@ class AgilentUnify:
     def generate_excel_files(self):
         """generates excel file versions of the unified excel format, using xlsxwriter.
 
-        allows us to add formatting to the file produced, which we can't do with the .csv version."""
+        allows us to add formatting to the file produced, which we can't do with the .csv version. the formats
+        denote shared fields - all rows in the file will have the same values in header_cell_format_1 cells,
+        all rows in a sample will have the same values in header_cell_format_2 cells, and the cells with
+        header_format_3 change each line. """
 
         target = r'T:\ANALYST WORK FILES\Peter\CrystalMB\UnifiedExcelFiles\ '
         batch_name = str(self.main_file_name)
@@ -166,6 +201,7 @@ class AgilentUnify:
         header_cell_format_1 = workbook.add_format({'bold': True, 'font_color': 'white', 'bg_color': '#2321a7'})
         header_cell_format_2 = workbook.add_format({'bold': True, 'font_color': 'white', 'bg_color': '#3330db'})
         header_cell_format_3 = workbook.add_format({'bold': True, 'font_color': 'black', 'bg_color': '#29abdc'})
+        # helps with the editing to change the color of each second line
         odd_sample_format = workbook.add_format({'bg_color': "#c7d6db"})
         even_sample_format = workbook.add_format({'bg_color': "#e9edef"})
         row = 0

@@ -1,12 +1,12 @@
+from AgilentUnify import AgilentUnify
+from WatersUnify import WatersUnify
 import tkinter as Tk
 from tkinter import filedialog
 import csv
-from AgilentUnify import AgilentUnify
-from WatersUnify import WatersUnify
 
 
 class UnifyTK(Tk.Frame):
-    """Runs the tk window that allwos the user to interact with EasyTrax.
+    """Runs the tk window that allows the user to interact with UnifyMB.
 
     Attributes
     ----------
@@ -74,23 +74,30 @@ class UnifyTK(Tk.Frame):
                 csv_file_reader = csv.reader(csv_file)
                 for item in csv_file_reader:
                     self.csv_file_in_list_format.append(item)
-            self.write_log_to_text_box("csv file successfully read. \n", True)
+            self.write_log_to_text_box("csv file successfully read. \n\n", True)
         except UnicodeDecodeError:
-            self.write_log_to_text_box("This file is not being recognized as a csv file. \n", True)
+            self.write_log_to_text_box("This file is not being recognized as a csv file. \n\n", True)
 
     def unify_pathway_decider(self):
-        """Decides which of the two pathways to send the csv down - Waters, or Agilent. """
+        """Decides which of the two pathways to send the csv down - Waters, or Agilent.
+
+        There are two different software packages controlling agilent ICP/MS instruments in the lab, so we have
+        an optional keyword argument if we are taking data from the older of the two ICP/MS systems. The fields
+        and data format provided are slightly different, and need separate but similar handling. """
 
         keyword_check = self.csv_file_in_list_format[0][1]
         if keyword_check == 'version':
             WatersUnify(self.csv_file_in_list_format).waters_unify_controller()
-            self.write_log_to_text_box("Waters csv file detected, sending down WatersUnify pathway. \n")
+            self.write_log_to_text_box("Waters csv file detected.\n" +
+                                       "sending down WatersUnify pathway. \n")
         elif keyword_check == 'Sample Type':
             AgilentUnify(self.csv_file_in_list_format).agilent_unify_controller()
-            self.write_log_to_text_box("Agilent csv file detected, sending down AgilentUnify pathway. \n")
+            self.write_log_to_text_box("Agilent csv file detected (Melanie ICP/MS)\n" +
+                                       "sending down AgilentUnify pathway. \n")
         elif keyword_check == 'Type':
             AgilentUnify(self.csv_file_in_list_format).agilent_unify_controller(old_icp=True)
-            self.write_log_to_text_box("Agilent csv file detected, sending down AgilentUnify pathway. \n")
+            self.write_log_to_text_box("Agilent csv file detected (Harry ICP/MS)\n" +
+                                       "sending down AgilentUnify pathway. \n")
         else:
             self.write_log_to_text_box("No valid unify pathway detected for this csv file. \n")
 

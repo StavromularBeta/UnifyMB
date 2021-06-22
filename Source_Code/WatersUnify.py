@@ -17,6 +17,8 @@ class WatersUnify:
         dictionary of required file fields, and their indexes. 0's are placeholders, indexes are found later.
     main_file_name : string
         the name of the excel file to be generated. Same as the batch name you'd use for the targetlynx file.
+    data_source : string
+        the source of the data - either will be UPLC/MS/MS, OR UPLC/UV. Uses the method name to figure it out.
     """
 
     def __init__(self, csv_file_in_list_of_list_format):
@@ -59,7 +61,10 @@ class WatersUnify:
         # self.generate_csv_files()
 
     def find_indexes_of_required_fields(self):
-        """finds the indexes of the fields we need to create our unified excel format."""
+        """finds the indexes of the fields we need to create our unified excel format.
+
+        This could be hard-coded in because the fields are always in the same order regardless of instrument,
+        but it's nice to have the option, so I'm leaving it in. """
 
         required_field_index_counter = 0
         for item in self.csv_file_in_list_of_list_format[0]:
@@ -70,7 +75,11 @@ class WatersUnify:
             required_field_index_counter += 1
 
     def create_condensed_csv_file_with_only_relevant_fields(self):
-        """takes only the required fields from the full csv file, and creates a condensed list of lists."""
+        """takes only the required fields from the full csv file, and creates a condensed list of lists.
+
+        Waters XML files have an abundance of data and produce all the values we need separately, so we just have
+        to re-organize them. With Agilent instruments, a little more massaging is needed. We just need functionality
+        to filter out blank lines, which isn't necessary with the Agilent .csv output files. """
         for item in self.csv_file_in_list_of_list_format[1:]:
             if item[self.required_fields_index_dictionary['name16']] == '':
                 # so we can ignore the blank lines potentially at the end of the file
@@ -92,7 +101,12 @@ class WatersUnify:
         self.main_file_name = self.csv_file_in_list_of_list_format_condensed[1][1][:-4]
 
     def generate_excel_files(self):
-        """generates excel file versions of the unified excel format, using xlsxwriter. """
+        """generates excel file versions of the unified excel format, using xlsxwriter.
+
+        allows us to add formatting to the file produced, which we can't do with the .csv version. the formats
+        denote shared fields - all rows in the file will have the same values in header_cell_format_1 cells,
+        all rows in a sample will have the same values in header_cell_format_2 cells, and the cells with
+        header_format_3 change each line.  """
 
         target = r'T:\ANALYST WORK FILES\Peter\CrystalMB\UnifiedExcelFiles\ '
         batch_name = str(self.main_file_name)
